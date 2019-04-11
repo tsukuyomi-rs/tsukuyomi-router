@@ -1,0 +1,12 @@
+[package]
+name = "tsukuyomi-router"
+version = "0.1.0"
+authors = ["Yusuke Sasaki <yusuke.sasaki.nuem@gmail.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+indexmap = "1"
+
+[dev-dependencies]
+route-recognizer = "0.1"
