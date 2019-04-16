@@ -1,8 +1,9 @@
 # `tsukuyomi-router`
 
 [![Build Status](https://dev.azure.com/tsukuyomi-rs/tsukuyomi-router/_apis/build/status/tsukuyomi-rs.tsukuyomi-router?branchName=master)](https://dev.azure.com/tsukuyomi-rs/tsukuyomi-router/_build/latest?definitionId=2&branchName=master)
+[![codecov](https://codecov.io/gh/tsukuyomi-rs/tsukuyomi-router/branch/master/graph/badge.svg)](https://codecov.io/gh/tsukuyomi-rs/tsukuyomi-router)
 
-An experimental HTTP router for general purpose.
+The next-generation HTTP router for Tsukuyomi Web framework.
 
 ## Example
 
@@ -13,8 +14,8 @@ let mut router = Router::new();
 router.add_route("/domain/mime", "mime")?;
 router.add_route("/domain/yours", "yours")?;
 
-router.find_route("/domain/mime").route // => Some("mime")
-router.find_route("/domain/mi").route   // => None
+router.find_route("/domain/mime").data // => Some("mime")
+router.find_route("/domain/mi").data   // => None
 ```
 
 ## Status

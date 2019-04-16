@@ -1,5 +1,11 @@
+resources:
+  containers:
+    - container: tarpaulin
+      image: xd009642/tarpaulin:latest
+      options: --security-opt seccomp=unconfined
+
 jobs:
-- job: Linux
+- job: Test
   pool:
     vmImage: 'Ubuntu-16.04'
 
@@ -80,3 +86,21 @@ jobs:
       EMAIL: 'yusuke.sasaki.nuem@gmail.com'
       GH_TOKEN: $(myGitHubToken)
       REPO_SLUG: tsukuyomi-rs/tsukuyomi-router
+
+- job: Tarpaulin
+  pool:
+    vmImage: 'ubuntu-16.04'
+  container: tarpaulin
+  steps:
+  - script: |
+      cargo --version
+      rustc --version
+      cargo tarpaulin --version
+    displayName: show tool versions
+
+  - script: |
+      cargo tarpaulin -v --out Xml
+      bash <(curl -s https://codecov.io/bash)
+    displayName: 'run coverage tests'
+    env:
+      CODECOV_TOKEN: $(myCodecovToken)
