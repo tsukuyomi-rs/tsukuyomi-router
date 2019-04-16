@@ -1,10 +1,7 @@
 mod insert;
 mod recognize;
 
-use crate::error::Result;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) struct RouteId(pub(crate) usize);
+use crate::RouteId;
 
 #[derive(Debug, Default)]
 pub(crate) struct Tree {
@@ -17,7 +14,8 @@ pub(crate) struct Node {
     static_segments: Vec<StaticSegment>,
     param_segment: Option<Box<Node>>,
     wildcard_segments: Vec<WildcardSegment>,
-    metadata: Metadata,
+
+    pub(crate) route: Option<RouteId>,
 }
 
 #[derive(Debug)]
@@ -47,25 +45,6 @@ impl StaticSegment {
                 ..Default::default()
             },
         };
-    }
-}
-
-#[derive(Debug, Default)]
-#[cfg_attr(test, derive(PartialEq))]
-pub(crate) struct Metadata {
-    pub(crate) route: Option<RouteId>,
-}
-
-impl Metadata {
-    fn merge(&mut self, other: Self) -> Result<()> {
-        match (&mut self.route, other.route) {
-            (Some(a), Some(b)) if *a != b => {
-                bail!("cannot register multiple routes with the same path")
-            }
-            (a, b) => *a = b,
-        }
-
-        Ok(())
     }
 }
 

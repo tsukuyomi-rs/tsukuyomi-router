@@ -77,3 +77,6 @@ pub use crate::{
     error::{Error, Result},
     router::{Params, Router, RouterResult},
 };
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+struct RouteId(usize);

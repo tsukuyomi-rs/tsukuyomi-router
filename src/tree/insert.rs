@@ -1,26 +1,54 @@
-use super::{Metadata, Node, ParamNames, StaticSegment, Tree, WildcardSegment};
+use super::{Node, ParamNames, StaticSegment, Tree, WildcardSegment};
 use crate::error::Result;
 
 impl Tree {
-    pub(crate) fn insert(&mut self, path: &[u8], metadata: Metadata) -> Result<ParamNames> {
-        let mut param_names = ParamNames::default();
+    pub(crate) fn insert(
+        &mut self,
+        path: &[u8],
+        names: &mut Option<ParamNames>,
+    ) -> Result<&mut Node> {
         let mut cx = InsertContext {
             path,
-            param_names: &mut param_names,
-            metadata: Some(metadata),
+            names: &mut *names,
         };
-        cx.run(&mut self.root)?;
-        Ok(param_names)
+        cx.run(&mut self.root)
     }
 }
 
 struct InsertContext<'a> {
     path: &'a [u8],
-    param_names: &'a mut ParamNames,
-    metadata: Option<Metadata>,
+    names: &'a mut Option<ParamNames>,
 }
 
 impl<'a> InsertContext<'a> {
+    fn run<'n>(&mut self, mut current: &'n mut Node) -> Result<&'n mut Node> {
+        loop {
+            match self.path.get(0) {
+                Some(b':') => {
+                    if current.param_segment.is_some() {
+                        self.extract_param()?;
+                        current = &mut *current.param_segment.as_mut().unwrap();
+                        continue;
+                    }
+                }
+                Some(b'*') => return self.insert_wildcard_segment(current),
+                Some(_) => {
+                    if let Some(pos) = self.find_static_segment(current)? {
+                        current = &mut { current }.static_segments[pos].child;
+                        continue;
+                    }
+                }
+                None => (),
+            }
+
+            if self.path.len() > 0 {
+                return self.insert_remaining_path(current);
+            }
+
+            return Ok(current);
+        }
+    }
+
     fn find_static_segment(&mut self, current: &mut Node) -> Result<Option<usize>> {
         for (i, s) in &mut current.static_segments.iter_mut().enumerate() {
             let lcp = longest_common_prefix(&s.segment, self.path);
@@ -41,50 +69,15 @@ impl<'a> InsertContext<'a> {
             .iter()
             .position(|&c| c == b'/')
             .unwrap_or_else(|| self.path.len());
-        self.param_names.names.push(self.path[1..end].to_owned());
+        self.names
+            .get_or_insert_with(Default::default)
+            .names
+            .push(self.path[1..end].to_owned());
         self.path = &self.path[end..];
         Ok(())
     }
 
-    fn run(&mut self, mut current: &mut Node) -> Result<()> {
-        loop {
-            match self.path.get(0) {
-                Some(b':') => {
-                    if current.param_segment.is_some() {
-                        self.extract_param()?;
-                        current = &mut *current.param_segment.as_mut().unwrap();
-                        continue;
-                    }
-                }
-                Some(b'*') => {
-                    self.insert_wildcard_segment(current)?;
-                    return Ok(());
-                }
-                Some(_) => {
-                    if let Some(pos) = self.find_static_segment(current)? {
-                        current = &mut { current }.static_segments[pos].child;
-                        continue;
-                    }
-                }
-                None => (),
-            }
-
-            if self.path.len() > 0 {
-                self.insert_remaining_path(current)?;
-                return Ok(());
-            }
-
-            current.metadata.merge(
-                self.metadata
-                    .take()
-                    .expect("the node has already been inserted"),
-            )?;
-
-            return Ok(());
-        }
-    }
-
-    fn insert_remaining_path(&mut self, mut node: &mut Node) -> Result<()> {
+    fn insert_remaining_path<'n>(&mut self, mut node: &'n mut Node) -> Result<&'n mut Node> {
         while let Some(c) = self.path.get(0) {
             match c {
                 b':' => {
@@ -93,10 +86,7 @@ impl<'a> InsertContext<'a> {
                         .param_segment
                         .get_or_insert_with(|| Box::new(Node::default()));
                 }
-                b'*' => {
-                    self.insert_wildcard_segment(node)?;
-                    return Ok(());
-                }
+                b'*' => return self.insert_wildcard_segment(node),
                 _ => {
                     let end =
                         if let Some(n) = self.path.iter().position(|&c| c == b':' || c == b'*') {
@@ -119,37 +109,27 @@ impl<'a> InsertContext<'a> {
             }
         }
 
-        node.metadata = self
-            .metadata
-            .take()
-            .expect("the node has already been inserted");
-
-        Ok(())
+        Ok(node)
     }
 
-    fn insert_wildcard_segment(&mut self, node: &mut Node) -> Result<()> {
+    fn insert_wildcard_segment<'n>(&mut self, node: &'n mut Node) -> Result<&'n mut Node> {
+        self.names.get_or_insert_with(Default::default).has_wildcard = true;
+
         let slug = &self.path[1..];
-        if let Some(n) = node.wildcard_segments.iter_mut().find(|s| s.slug == slug) {
-            n.child.metadata.merge(
-                self.metadata
-                    .take()
-                    .expect("the node has already been inserted."),
-            )?;
-        } else {
-            node.wildcard_segments.push(WildcardSegment {
-                slug: slug.to_owned(),
-                child: Node {
-                    metadata: self
-                        .metadata
-                        .take()
-                        .expect("the node has already been inserted."),
-                    ..Default::default()
-                },
-            });
+        if let Some(pos) = node
+            .wildcard_segments
+            .iter_mut()
+            .position(|s| s.slug == slug)
+        {
+            return Ok(&mut node.wildcard_segments[pos].child);
         }
 
-        self.param_names.has_wildcard = true;
-        Ok(())
+        node.wildcard_segments.push(WildcardSegment {
+            slug: slug.to_owned(),
+            child: Node::default(),
+        });
+
+        Ok(&mut node.wildcard_segments.iter_mut().last().unwrap().child)
     }
 }
 
@@ -159,19 +139,13 @@ fn longest_common_prefix(s1: &[u8], s2: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::super::RouteId;
     use super::*;
+    use crate::tree::RouteId;
 
     #[test]
     fn root() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/", &mut None).unwrap().route = Some(RouteId(0));
 
         assert_eq!(
             tree.root,
@@ -179,9 +153,7 @@ mod tests {
                 static_segments: vec![StaticSegment {
                     segment: "/".into(),
                     child: Node {
-                        metadata: Metadata {
-                            route: Some(RouteId(0))
-                        },
+                        route: Some(RouteId(0)),
                         ..Default::default()
                     }
                 },],
@@ -193,20 +165,8 @@ mod tests {
     #[test]
     fn inclusive() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/foo",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/foo/bar",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/foo", &mut None).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(
             tree.root,
@@ -214,21 +174,17 @@ mod tests {
                 static_segments: vec![StaticSegment {
                     segment: "/foo".into(),
                     child: Node {
-                        metadata: Metadata {
-                            route: Some(RouteId(0))
-                        },
+                        route: Some(RouteId(0)),
                         static_segments: vec![StaticSegment {
                             segment: "/bar".into(),
                             child: Node {
-                                metadata: Metadata {
-                                    route: Some(RouteId(1))
-                                },
+                                route: Some(RouteId(1)),
                                 ..Default::default()
                             },
                         }],
                         ..Default::default()
                     }
-                },],
+                }],
                 ..Default::default()
             }
         );
@@ -237,20 +193,8 @@ mod tests {
     #[test]
     fn different_suffix() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/foo/bar",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/foo/zoo",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/foo/zoo", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(
             tree.root,
@@ -262,25 +206,21 @@ mod tests {
                             StaticSegment {
                                 segment: "bar".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(0))
-                                    },
+                                    route: Some(RouteId(0)),
                                     ..Default::default()
                                 },
                             },
                             StaticSegment {
                                 segment: "zoo".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(1))
-                                    },
+                                    route: Some(RouteId(1)),
                                     ..Default::default()
                                 }
                             },
                         ],
                         ..Default::default()
                     }
-                },],
+                }],
                 ..Default::default()
             }
         );
@@ -289,14 +229,8 @@ mod tests {
     #[test]
     fn param() {
         let mut tree = Tree::default();
-        let params = tree
-            .insert(
-                b"/posts/:post",
-                Metadata {
-                    route: Some(RouteId(0)),
-                },
-            )
-            .unwrap();
+        let mut params = None;
+        tree.insert(b"/posts/:post", &mut params).unwrap().route = Some(RouteId(0));
 
         assert_eq!(
             tree.root,
@@ -305,9 +239,7 @@ mod tests {
                     segment: "/posts/".into(),
                     child: Node {
                         param_segment: Some(Box::new(Node {
-                            metadata: Metadata {
-                                route: Some(RouteId(0))
-                            },
+                            route: Some(RouteId(0)),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -317,20 +249,16 @@ mod tests {
             }
         );
 
-        assert_eq!(params.names, vec![b"post".to_owned()]);
+        assert_eq!(params.unwrap().names, vec![b"post".to_owned()]);
     }
 
     #[test]
     fn param_with_suffix() {
         let mut tree = Tree::default();
-        let params = tree
-            .insert(
-                b"/posts/:post/edit",
-                Metadata {
-                    route: Some(RouteId(0)),
-                },
-            )
-            .unwrap();
+        let mut params = None;
+        tree.insert(b"/posts/:post/edit", &mut params)
+            .unwrap()
+            .route = Some(RouteId(0));
 
         assert_eq!(
             tree.root,
@@ -342,9 +270,7 @@ mod tests {
                             static_segments: vec![StaticSegment {
                                 segment: "/edit".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(0))
-                                    },
+                                    route: Some(RouteId(0)),
                                     ..Default::default()
                                 },
                             }],
@@ -357,36 +283,16 @@ mod tests {
             }
         );
 
-        assert_eq!(params.names, vec![b"post".to_owned()]);
+        assert_eq!(params.unwrap().names, vec![b"post".to_owned()]);
     }
 
     #[test]
     fn parameters() {
         let mut tree = Tree::default();
-        let p1 = tree
-            .insert(
-                b"/users/:id",
-                Metadata {
-                    route: Some(RouteId(0)),
-                },
-            )
-            .unwrap();
-        let p2 = tree
-            .insert(
-                b"/users/:id/books",
-                Metadata {
-                    route: Some(RouteId(1)),
-                },
-            )
-            .unwrap();
-        let p3 = tree
-            .insert(
-                b"/users/admin/books",
-                Metadata {
-                    route: Some(RouteId(2)),
-                },
-            )
-            .unwrap();
+        let (mut p1, mut p2, mut p3) = (None, None, None);
+        tree.insert(b"/users/:id", &mut p1).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/users/:id/books", &mut p2).unwrap().route = Some(RouteId(1));
+        tree.insert(b"/users/admin/books", &mut p3).unwrap().route = Some(RouteId(2));
 
         assert_eq!(
             tree.root,
@@ -397,22 +303,16 @@ mod tests {
                         static_segments: vec![StaticSegment {
                             segment: "admin/books".into(),
                             child: Node {
-                                metadata: Metadata {
-                                    route: Some(RouteId(2))
-                                },
+                                route: Some(RouteId(2)),
                                 ..Default::default()
                             },
                         }],
                         param_segment: Some(Box::new(Node {
-                            metadata: Metadata {
-                                route: Some(RouteId(0))
-                            },
+                            route: Some(RouteId(0)),
                             static_segments: vec![StaticSegment {
                                 segment: "/books".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(1))
-                                    },
+                                    route: Some(RouteId(1)),
                                     ..Default::default()
                                 },
                             }],
@@ -425,21 +325,16 @@ mod tests {
             }
         );
 
-        assert_eq!(p1.names, vec![b"id".to_owned()]);
-        assert_eq!(p2.names, vec![b"id".to_owned()]);
-        assert!(p3.names.is_empty());
+        assert_eq!(p1.unwrap().names, vec![b"id".to_owned()]);
+        assert_eq!(p2.unwrap().names, vec![b"id".to_owned()]);
+        assert!(p3.is_none());
     }
 
     #[test]
     fn wildcard() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        let mut params = None;
+        tree.insert(b"/static/*", &mut params).unwrap().route = Some(RouteId(0));
 
         assert_eq!(
             tree.root,
@@ -450,9 +345,7 @@ mod tests {
                         wildcard_segments: vec![WildcardSegment {
                             slug: "".into(),
                             child: Node {
-                                metadata: Metadata {
-                                    route: Some(RouteId(0)),
-                                },
+                                route: Some(RouteId(0)),
                                 ..Default::default()
                             },
                         }],
@@ -462,18 +355,16 @@ mod tests {
                 ..Default::default()
             }
         );
+        assert!(params.map_or(false, |p| p.has_wildcard));
     }
 
     #[test]
     fn wildcard_with_slug() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*/index.html",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        let mut params = None;
+        tree.insert(b"/static/*/index.html", &mut params)
+            .unwrap()
+            .route = Some(RouteId(0));
 
         assert_eq!(
             tree.root,
@@ -484,9 +375,7 @@ mod tests {
                         wildcard_segments: vec![WildcardSegment {
                             slug: "/index.html".into(),
                             child: Node {
-                                metadata: Metadata {
-                                    route: Some(RouteId(0)),
-                                },
+                                route: Some(RouteId(0)),
                                 ..Default::default()
                             },
                         }],
@@ -496,25 +385,16 @@ mod tests {
                 ..Default::default()
             }
         );
+        assert!(params.map_or(false, |p| p.has_wildcard));
     }
 
     #[test]
     fn wildcard_with_different_slugs() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*/index.html",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/static/*/index.js",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/static/*/index.html", &mut None)
+            .unwrap()
+            .route = Some(RouteId(0));
+        tree.insert(b"/static/*/index.js", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(
             tree.root,
@@ -526,18 +406,14 @@ mod tests {
                             WildcardSegment {
                                 slug: "/index.html".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(0)),
-                                    },
+                                    route: Some(RouteId(0)),
                                     ..Default::default()
                                 },
                             },
                             WildcardSegment {
                                 slug: "/index.js".into(),
                                 child: Node {
-                                    metadata: Metadata {
-                                        route: Some(RouteId(1)),
-                                    },
+                                    route: Some(RouteId(1)),
                                     ..Default::default()
                                 },
                             },
@@ -549,47 +425,4 @@ mod tests {
             }
         );
     }
-
-    #[test]
-    fn failcase_duplicated_path() {
-        let mut tree = Tree::default();
-        assert!(tree
-            .insert(
-                b"/foo/bar",
-                Metadata {
-                    route: Some(RouteId(0))
-                }
-            )
-            .is_ok());
-        assert!(tree
-            .insert(
-                b"/foo/bar",
-                Metadata {
-                    route: Some(RouteId(1))
-                }
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn failcase_duplicated_wildcard() {
-        let mut tree = Tree::default();
-        assert!(tree
-            .insert(
-                b"/*/a",
-                Metadata {
-                    route: Some(RouteId(0))
-                }
-            )
-            .is_ok());
-        assert!(tree
-            .insert(
-                b"/*/a",
-                Metadata {
-                    route: Some(RouteId(1))
-                }
-            )
-            .is_err());
-    }
-
 }

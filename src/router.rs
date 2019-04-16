@@ -1,21 +1,23 @@
 use crate::{
     error::Result, //
-    tree::{Metadata, ParamNames, RouteId, Tree},
+    tree::{ParamNames, Tree},
+    RouteId,
 };
 use indexmap::IndexMap;
 use std::borrow::Cow;
 
 #[derive(Debug)]
 struct Route<T> {
+    path: String,
+    names: Option<ParamNames>,
     data: T,
-    names: ParamNames,
 }
 
 /// An HTTP router.
 #[derive(Debug)]
 pub struct Router<T> {
     tree: Tree,
-    routes: IndexMap<String, Route<T>>,
+    routes: IndexMap<RouteId, Route<T>>,
 }
 
 impl<T> Default for Router<T> {
@@ -35,13 +37,21 @@ impl<T> Router<T> {
 
     /// Adds a route to the router with the specified path.
     pub fn add_route(&mut self, path: &str, data: T) -> Result<&mut Self> {
-        let names = self.tree.insert(
-            path.as_ref(),
-            Metadata {
-                route: Some(RouteId(self.routes.len())),
+        let route_id = RouteId(self.routes.len());
+
+        let mut names = None;
+        let leaf = self.tree.insert(path.as_ref(), &mut names)?;
+        leaf.route = Some(route_id);
+
+        self.routes.insert(
+            route_id,
+            Route {
+                path: path.to_owned(),
+                names,
+                data,
             },
-        )?;
-        self.routes.insert(path.to_owned(), Route { data, names });
+        );
+
         Ok(self)
     }
 
@@ -54,7 +64,7 @@ impl<T> Router<T> {
             .and_then(|RouteId(i)| self.routes.get_index(i).map(|(_k, route)| route));
 
         let data = route.map(|r| &r.data);
-        let names = route.map(|r| &r.names);
+        let names = route.and_then(|r| r.names.as_ref());
         let wildcard = names.map_or(None, |names| {
             if names.has_wildcard() {
                 recognize.wildcard.map(|(s, e)| Cow::Borrowed(&path[s..e]))

@@ -22,7 +22,7 @@ impl Tree {
         let node = cx.run(&self.root);
 
         let route = if path.len() == cx.offset {
-            node.metadata.route
+            node.route
         } else {
             None
         };
@@ -115,7 +115,6 @@ impl<'a> RecognizeContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Metadata;
     use super::*;
 
     #[test]
@@ -127,13 +126,7 @@ mod tests {
     #[test]
     fn root_node() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/", &mut None).unwrap().route = Some(RouteId(0));
 
         assert_eq!(tree.recognize(b"/").route, Some(RouteId(0)));
     }
@@ -141,13 +134,7 @@ mod tests {
     #[test]
     fn nested_url() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/books/23/chapters",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/books/23/chapters", &mut None).unwrap().route = Some(RouteId(0));
 
         assert_eq!(
             tree.recognize(b"/books/23/chapters").route,
@@ -162,20 +149,8 @@ mod tests {
     #[test]
     fn multiple_routes() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/domains/mime",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/domains/yours",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/domains/mime", &mut None).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/domains/yours", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(tree.recognize(b"/domains/mime").route, Some(RouteId(0)));
         assert_eq!(tree.recognize(b"/domains/yours").route, Some(RouteId(1)));
@@ -187,13 +162,7 @@ mod tests {
     #[test]
     fn single_param() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/posts/:post",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/posts/:post", &mut None).unwrap().route = Some(RouteId(0));
 
         let recognize = tree.recognize(b"/posts/42");
         assert_eq!(recognize.route, Some(RouteId(0)));
@@ -203,13 +172,7 @@ mod tests {
     #[test]
     fn param_with_suffix() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/posts/:post/edit",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/posts/:post/edit", &mut None).unwrap().route = Some(RouteId(0));
 
         let recognize = tree.recognize(b"/posts/42/edit");
         assert_eq!(recognize.route, Some(RouteId(0)));
@@ -221,13 +184,9 @@ mod tests {
     #[test]
     fn many_params() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/:year/:month/:date",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/:year/:month/:date", &mut None)
+            .unwrap()
+            .route = Some(RouteId(0));
 
         let recognize = tree.recognize(b"/2019/05/01");
         assert_eq!(recognize.route, Some(RouteId(0)));
@@ -239,20 +198,8 @@ mod tests {
     #[test]
     fn param_with_static_segment() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/posts/new",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/posts/:post",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/posts/new", &mut None).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/posts/:post", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(tree.recognize(b"/posts/new").route, Some(RouteId(0)));
 
@@ -264,13 +211,7 @@ mod tests {
     #[test]
     fn wildcard() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/static/*", &mut None).unwrap().route = Some(RouteId(0));
 
         let recognize = tree.recognize(b"/static/path/to/index.html");
         assert_eq!(recognize.route, Some(RouteId(0)));
@@ -280,13 +221,9 @@ mod tests {
     #[test]
     fn wildcard_with_slug() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*/index.html",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/static/*/index.html", &mut None)
+            .unwrap()
+            .route = Some(RouteId(0));
 
         let recognize = tree.recognize(b"/static/path/to/index.html");
         assert_eq!(recognize.route, Some(RouteId(0)));
@@ -296,20 +233,10 @@ mod tests {
     #[test]
     fn many_wildcards() {
         let mut tree = Tree::default();
-        tree.insert(
-            b"/static/*/index.html",
-            Metadata {
-                route: Some(RouteId(0)),
-            },
-        )
-        .unwrap();
-        tree.insert(
-            b"/static/*.html",
-            Metadata {
-                route: Some(RouteId(1)),
-            },
-        )
-        .unwrap();
+        tree.insert(b"/static/*/index.html", &mut None)
+            .unwrap()
+            .route = Some(RouteId(0));
+        tree.insert(b"/static/*.html", &mut None).unwrap().route = Some(RouteId(1));
 
         assert_eq!(
             tree.recognize(b"/static/path/to/index.html").route,
