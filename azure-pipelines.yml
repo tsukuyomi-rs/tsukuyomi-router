@@ -1,21 +1,82 @@
-trigger:
-- master
+jobs:
+- job: Linux
+  pool:
+    vmImage: 'Ubuntu-16.04'
 
-pool:
-  vmImage: 'Ubuntu-16.04'
+  strategy:
+    matrix:
+      stable:
+        rust_toolchain: stable
+      nightly:
+        rust_toolchain: nightly
+      minimum_supported:
+        rust_toolchain: 1.34.0
 
-steps:
-- script: |
-    curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
-    echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
-  displayName: 'install rustup'
+  steps:
+  - script: |
+      curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain "$RUST_TOOLCHAIN" -y
+      echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
+    displayName: 'install rustup'
 
-- script: |
-    rustup --version
-    rustc --version
-    cargo --version
-  displayName: 'show tool versions'
+  - script: |
+      rustup component add rustfmt clippy
+    displayName: 'install linters'
+    condition: and(succeeded(), ne(variables['rust_toolchain'], 'nightly'))
 
-- script: |
-    cargo test
-  displayName: 'run test'
+  - script: |
+      cargo install --debug cargo2junit
+    displayName: install cargo2junit
+
+  - script: |
+      rustup --version
+      rustc --version
+      cargo --version
+    displayName: 'show tool versions'
+    condition: and(succeeded(), ne(variables['rust_toolchain'], 'nightly'))
+
+  - script: |
+      cargo test -- -Z unstable-options --format json | cargo2junit > result.xml
+    displayName: 'run test'
+    condition: and(succeeded(), ne(variables['rust_toolchain'], 'nightly'))
+
+  - script: |
+      cargo test -- -Z unstable-options --format json | cargo2junit > result.xml
+    displayName: 'run test (only on nightly channel)'
+    continueOnError: true
+    condition: and(succeeded(), eq(variables['rust_toolchain'], 'nightly'))
+
+  - script: |
+      cargo bench
+    displayName: 'run benchmark test (only on nightly channel)'
+    continueOnError: true
+    condition: and(succeeded(), eq(variables['rust_toolchain'], 'nightly'))
+
+  - task: PublishTestResults@2
+    inputs:
+      testResultsFormat: 'JUnit'
+      testResultsFiles: 'result.xml'
+    condition: succeededOrFailed()
+    continueOnError: true
+
+  - script: |
+      cargo doc --no-deps
+    displayName: 'build API documentation'
+    condition: and(succeeded(), eq(variables['rust_toolchain'], 'stable'))
+
+  - script: |
+      set -e
+      cd target/doc
+      git init
+      git remote add upstream "https://${GH_TOKEN}@github.com/${REPO_SLUG}.git"
+      git config user.name "$USER"
+      git config user.email "$EMAIL"
+      git add -A .
+      git commit -qm "Build API doc at $BUILD_SOURCEVERSION"
+      git push -q upstream HEAD:refs/heads/gh-pages --force
+    displayName: 'deploy API documentation'
+    condition: and(succeeded(), eq(variables['rust_toolchain'], 'stable'), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
+    env:
+      USER: 'Yusuke Sasaki'
+      EMAIL: 'yusuke.sasaki.nuem@gmail.com'
+      GH_TOKEN: $(myGitHubToken)
+      REPO_SLUG: tsukuyomi-rs/tsukuyomi-router
