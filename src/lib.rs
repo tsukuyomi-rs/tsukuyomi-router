@@ -11,10 +11,10 @@
 //! router.add_route("/*/slug", "slug")?;
 //! router.add_route("/*", "catch_all")?;
 //!
-//! assert_eq!(router.find_route("/users/3").route, Some(&"users"));
-//! assert_eq!(router.find_route("/users/3/books").route, Some(&"users_books"));
-//! assert_eq!(router.find_route("/coffee_maker/slug").route, Some(&"slug"));
-//! assert_eq!(router.find_route("/made/up/url").route, Some(&"catch_all"));
+//! assert_eq!(router.find_route("/users/3").data, Some(&"users"));
+//! assert_eq!(router.find_route("/users/3/books").data, Some(&"users_books"));
+//! assert_eq!(router.find_route("/coffee_maker/slug").data, Some(&"slug"));
+//! assert_eq!(router.find_route("/made/up/url").data, Some(&"catch_all"));
 //! # Ok::<(), tsukuyomi_router::Error>(())
 //! ```
 //!
