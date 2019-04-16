@@ -1,0 +1,21 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'Ubuntu-16.04'
+
+steps:
+- script: |
+    curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain stable -y
+    echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
+  displayName: 'install rustup'
+
+- script: |
+    rustup --version
+    rustc --version
+    cargo --version
+  displayName: 'show tool versions'
+
+- script: |
+    cargo test
+  displayName: 'run test'
