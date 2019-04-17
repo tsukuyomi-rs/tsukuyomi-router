@@ -1,10 +1,11 @@
-use super::{Node, RouteId, StaticSegment, Tree, WildcardSegment};
+use super::{Node, RouteId, ScopeId, StaticSegment, Tree, WildcardSegment};
 
 #[derive(Debug)]
 pub(crate) struct Recognize {
     pub(crate) route: Option<RouteId>,
     pub(crate) params: Vec<(usize, usize)>,
     pub(crate) wildcard: Option<(usize, usize)>,
+    pub(crate) scopes: Vec<ScopeId>,
     _p: (),
 }
 
@@ -12,10 +13,12 @@ impl Tree {
     pub(crate) fn recognize<'p>(&'p self, path: &'p [u8]) -> Recognize {
         let mut params = vec![];
         let mut wildcard = None;
+        let mut scopes = vec![];
 
         let mut cx = RecognizeContext {
             path,
             offset: 0,
+            scopes: &mut scopes,
             params: &mut params,
             wildcard: &mut wildcard,
         };
@@ -29,6 +32,7 @@ impl Tree {
 
         Recognize {
             route,
+            scopes,
             params,
             wildcard,
             _p: (),
@@ -40,6 +44,7 @@ impl Tree {
 struct RecognizeContext<'a> {
     path: &'a [u8],
     offset: usize,
+    scopes: &'a mut Vec<ScopeId>,
     params: &'a mut Vec<(usize, usize)>,
     wildcard: &'a mut Option<(usize, usize)>,
 }
@@ -47,6 +52,10 @@ struct RecognizeContext<'a> {
 impl<'a> RecognizeContext<'a> {
     fn run<'n>(&mut self, mut current: &'n Node) -> &'n Node {
         loop {
+            if let Some(scope) = current.scope {
+                self.scopes.push(scope);
+            }
+
             if self.path.len() <= self.offset {
                 return current;
             }
@@ -246,5 +255,25 @@ mod tests {
             tree.recognize(b"/static/about.html").route,
             Some(RouteId(1))
         );
+    }
+
+    #[test]
+    fn scopes() {
+        let mut tree = Tree::default();
+        tree.insert(b"/path/to/index.html", &mut None) //
+            .unwrap()
+            .route = Some(RouteId(0));
+
+        tree.insert(b"/path/", &mut None).unwrap().scope = Some(ScopeId(0));
+        tree.insert(b"/path/to", &mut None) //
+            .unwrap()
+            .scope = Some(ScopeId(1));
+
+        assert_eq!(tree.recognize(b"/path/foo").scopes, vec![ScopeId(0)]);
+        assert_eq!(
+            tree.recognize(b"/path/to/index").scopes,
+            vec![ScopeId(0), ScopeId(1)]
+        );
+        assert_eq!(tree.recognize(b"/pattern").scopes, vec![]);
     }
 }

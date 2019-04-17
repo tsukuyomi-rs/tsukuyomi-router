@@ -1,7 +1,7 @@
 mod insert;
 mod recognize;
 
-use crate::router::RouteId;
+use crate::router::{RouteId, ScopeId};
 
 #[derive(Debug, Default)]
 pub(crate) struct Tree {
@@ -16,6 +16,7 @@ pub(crate) struct Node {
     wildcard_segments: Vec<WildcardSegment>,
 
     pub(crate) route: Option<RouteId>,
+    pub(crate) scope: Option<ScopeId>,
 }
 
 #[derive(Debug)]
