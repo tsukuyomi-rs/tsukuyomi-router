@@ -1,7 +1,7 @@
 mod insert;
 mod recognize;
 
-use crate::RouteId;
+use crate::router::RouteId;
 
 #[derive(Debug, Default)]
 pub(crate) struct Tree {
@@ -45,21 +45,5 @@ impl StaticSegment {
                 ..Default::default()
             },
         };
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub(crate) struct ParamNames {
-    names: Vec<Vec<u8>>,
-    has_wildcard: bool,
-}
-
-impl ParamNames {
-    pub(crate) fn position(&self, name: impl AsRef<[u8]>) -> Option<usize> {
-        self.names.iter().position(|n| *n == name.as_ref())
-    }
-
-    pub(crate) fn has_wildcard(&self) -> bool {
-        self.has_wildcard
     }
 }

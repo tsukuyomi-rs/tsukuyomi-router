@@ -6,10 +6,16 @@ fn simple() -> tsukuyomi_router::Result<()> {
     router.add_route("/domain/mime", "mime")?;
     router.add_route("/domain/yours", "yours")?;
 
-    assert_eq!(router.find_route("/domain/mime").data, Some(&"mime"));
-    assert_eq!(router.find_route("/domain/yours").data, Some(&"yours"));
+    assert_eq!(
+        router.recognize("/domain/mime").route().map(|r| r.data()),
+        Some(&"mime")
+    );
+    assert_eq!(
+        router.recognize("/domain/yours").route().map(|r| r.data()),
+        Some(&"yours")
+    );
 
-    assert!(router.find_route("/domain/me").data.is_none());
+    assert!(router.recognize("/domain/me").route().is_none());
 
     Ok(())
 }
@@ -21,13 +27,13 @@ fn param() -> tsukuyomi_router::Result<()> {
     router.add_route("/posts/create", "create_post")?;
 
     assert_eq!(
-        router.find_route("/posts/create").data,
+        router.recognize("/posts/create").route().map(|r| r.data()),
         Some(&"create_post")
     );
 
-    let res = router.find_route("/posts/12");
-    assert_eq!(res.data, Some(&"the_post"));
-    assert_eq!(&res.params[0], "12");
+    let res = router.recognize("/posts/12");
+    assert_eq!(res.route().map(|r| r.data()), Some(&"the_post"));
+    assert_eq!(&res.params().unwrap()[0], "12");
 
     Ok(())
 }
@@ -39,15 +45,18 @@ fn wildcard() -> tsukuyomi_router::Result<()> {
     router.add_route("/*", "catch_all")?;
 
     {
-        let res = router.find_route("/public/path/to/index.html");
-        assert_eq!(res.data, Some(&"public_index"));
-        assert_eq!(res.wildcard, Some("path/to".into()));
+        let res = router.recognize("/public/path/to/index.html");
+        assert_eq!(res.route().map(|r| r.data()), Some(&"public_index"));
+        assert_eq!(res.params().unwrap().get_wildcard(), Some("path/to"));
     }
 
     {
-        let res = router.find_route("/path/to/index.html");
-        assert_eq!(res.data, Some(&"catch_all"));
-        assert_eq!(res.wildcard, Some("path/to/index.html".into()));
+        let res = router.recognize("/path/to/index.html");
+        assert_eq!(res.route().map(|r| r.data()), Some(&"catch_all"));
+        assert_eq!(
+            res.params().unwrap().get_wildcard(),
+            Some("path/to/index.html")
+        );
     }
 
     Ok(())

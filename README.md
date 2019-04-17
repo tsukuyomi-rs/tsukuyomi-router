@@ -14,8 +14,8 @@ let mut router = Router::new();
 router.add_route("/domain/mime", "mime")?;
 router.add_route("/domain/yours", "yours")?;
 
-router.find_route("/domain/mime").data // => Some("mime")
-router.find_route("/domain/mi").data   // => None
+router.recognize("/domain/mime").route().map(|r| &r.data) // => Some(&"mime")
+router.recognize("/domain/mi").route()   // => None
 ```
 
 ## Status

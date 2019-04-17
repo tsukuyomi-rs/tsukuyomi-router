@@ -11,10 +11,10 @@
 //! router.add_route("/*/slug", "slug")?;
 //! router.add_route("/*", "catch_all")?;
 //!
-//! assert_eq!(router.find_route("/users/3").data, Some(&"users"));
-//! assert_eq!(router.find_route("/users/3/books").data, Some(&"users_books"));
-//! assert_eq!(router.find_route("/coffee_maker/slug").data, Some(&"slug"));
-//! assert_eq!(router.find_route("/made/up/url").data, Some(&"catch_all"));
+//! assert_eq!(router.recognize("/users/3").route().map(|r| r.data()), Some(&"users"));
+//! assert_eq!(router.recognize("/users/3/books").route().map(|r| r.data()), Some(&"users_books"));
+//! assert_eq!(router.recognize("/coffee_maker/slug").route().map(|r| r.data()), Some(&"slug"));
+//! assert_eq!(router.recognize("/made/up/url").route().map(|r| r.data()), Some(&"catch_all"));
 //! # Ok::<(), tsukuyomi_router::Error>(())
 //! ```
 //!
@@ -70,13 +70,12 @@
 
 #[macro_use]
 mod error;
+mod param;
 mod router;
 mod tree;
 
 pub use crate::{
     error::{Error, Result},
-    router::{Params, Router, RouterResult},
+    param::Params,
+    router::{Recognize, Route, RouteId, Router},
 };
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-struct RouteId(usize);

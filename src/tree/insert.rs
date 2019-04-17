@@ -1,5 +1,5 @@
-use super::{Node, ParamNames, StaticSegment, Tree, WildcardSegment};
-use crate::error::Result;
+use super::{Node, StaticSegment, Tree, WildcardSegment};
+use crate::{error::Result, param::ParamNames};
 
 impl Tree {
     pub(crate) fn insert(
