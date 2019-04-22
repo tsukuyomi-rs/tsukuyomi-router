@@ -140,12 +140,12 @@ fn longest_common_prefix(s1: &[u8], s2: &[u8]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tree::RouteId;
+    use crate::endpoint::EndpointId;
 
     #[test]
     fn root() {
         let mut tree = Tree::default();
-        tree.insert(b"/", &mut None).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/", &mut None).unwrap().route = Some(EndpointId(0));
 
         assert_eq!(
             tree.root,
@@ -153,7 +153,7 @@ mod tests {
                 static_segments: vec![StaticSegment {
                     segment: "/".into(),
                     child: Node {
-                        route: Some(RouteId(0)),
+                        route: Some(EndpointId(0)),
                         ..Default::default()
                     }
                 },],
@@ -165,8 +165,8 @@ mod tests {
     #[test]
     fn inclusive() {
         let mut tree = Tree::default();
-        tree.insert(b"/foo", &mut None).unwrap().route = Some(RouteId(0));
-        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(RouteId(1));
+        tree.insert(b"/foo", &mut None).unwrap().route = Some(EndpointId(0));
+        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(EndpointId(1));
 
         assert_eq!(
             tree.root,
@@ -174,11 +174,11 @@ mod tests {
                 static_segments: vec![StaticSegment {
                     segment: "/foo".into(),
                     child: Node {
-                        route: Some(RouteId(0)),
+                        route: Some(EndpointId(0)),
                         static_segments: vec![StaticSegment {
                             segment: "/bar".into(),
                             child: Node {
-                                route: Some(RouteId(1)),
+                                route: Some(EndpointId(1)),
                                 ..Default::default()
                             },
                         }],
@@ -193,8 +193,8 @@ mod tests {
     #[test]
     fn different_suffix() {
         let mut tree = Tree::default();
-        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(RouteId(0));
-        tree.insert(b"/foo/zoo", &mut None).unwrap().route = Some(RouteId(1));
+        tree.insert(b"/foo/bar", &mut None).unwrap().route = Some(EndpointId(0));
+        tree.insert(b"/foo/zoo", &mut None).unwrap().route = Some(EndpointId(1));
 
         assert_eq!(
             tree.root,
@@ -206,14 +206,14 @@ mod tests {
                             StaticSegment {
                                 segment: "bar".into(),
                                 child: Node {
-                                    route: Some(RouteId(0)),
+                                    route: Some(EndpointId(0)),
                                     ..Default::default()
                                 },
                             },
                             StaticSegment {
                                 segment: "zoo".into(),
                                 child: Node {
-                                    route: Some(RouteId(1)),
+                                    route: Some(EndpointId(1)),
                                     ..Default::default()
                                 }
                             },
@@ -230,7 +230,7 @@ mod tests {
     fn param() {
         let mut tree = Tree::default();
         let mut params = None;
-        tree.insert(b"/posts/:post", &mut params).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/posts/:post", &mut params).unwrap().route = Some(EndpointId(0));
 
         assert_eq!(
             tree.root,
@@ -239,7 +239,7 @@ mod tests {
                     segment: "/posts/".into(),
                     child: Node {
                         param_segment: Some(Box::new(Node {
-                            route: Some(RouteId(0)),
+                            route: Some(EndpointId(0)),
                             ..Default::default()
                         })),
                         ..Default::default()
@@ -258,7 +258,7 @@ mod tests {
         let mut params = None;
         tree.insert(b"/posts/:post/edit", &mut params)
             .unwrap()
-            .route = Some(RouteId(0));
+            .route = Some(EndpointId(0));
 
         assert_eq!(
             tree.root,
@@ -270,7 +270,7 @@ mod tests {
                             static_segments: vec![StaticSegment {
                                 segment: "/edit".into(),
                                 child: Node {
-                                    route: Some(RouteId(0)),
+                                    route: Some(EndpointId(0)),
                                     ..Default::default()
                                 },
                             }],
@@ -290,9 +290,9 @@ mod tests {
     fn parameters() {
         let mut tree = Tree::default();
         let (mut p1, mut p2, mut p3) = (None, None, None);
-        tree.insert(b"/users/:id", &mut p1).unwrap().route = Some(RouteId(0));
-        tree.insert(b"/users/:id/books", &mut p2).unwrap().route = Some(RouteId(1));
-        tree.insert(b"/users/admin/books", &mut p3).unwrap().route = Some(RouteId(2));
+        tree.insert(b"/users/:id", &mut p1).unwrap().route = Some(EndpointId(0));
+        tree.insert(b"/users/:id/books", &mut p2).unwrap().route = Some(EndpointId(1));
+        tree.insert(b"/users/admin/books", &mut p3).unwrap().route = Some(EndpointId(2));
 
         assert_eq!(
             tree.root,
@@ -303,16 +303,16 @@ mod tests {
                         static_segments: vec![StaticSegment {
                             segment: "admin/books".into(),
                             child: Node {
-                                route: Some(RouteId(2)),
+                                route: Some(EndpointId(2)),
                                 ..Default::default()
                             },
                         }],
                         param_segment: Some(Box::new(Node {
-                            route: Some(RouteId(0)),
+                            route: Some(EndpointId(0)),
                             static_segments: vec![StaticSegment {
                                 segment: "/books".into(),
                                 child: Node {
-                                    route: Some(RouteId(1)),
+                                    route: Some(EndpointId(1)),
                                     ..Default::default()
                                 },
                             }],
@@ -334,7 +334,7 @@ mod tests {
     fn wildcard() {
         let mut tree = Tree::default();
         let mut params = None;
-        tree.insert(b"/static/*", &mut params).unwrap().route = Some(RouteId(0));
+        tree.insert(b"/static/*", &mut params).unwrap().route = Some(EndpointId(0));
 
         assert_eq!(
             tree.root,
@@ -345,7 +345,7 @@ mod tests {
                         wildcard_segments: vec![WildcardSegment {
                             slug: "".into(),
                             child: Node {
-                                route: Some(RouteId(0)),
+                                route: Some(EndpointId(0)),
                                 ..Default::default()
                             },
                         }],
@@ -364,7 +364,7 @@ mod tests {
         let mut params = None;
         tree.insert(b"/static/*/index.html", &mut params)
             .unwrap()
-            .route = Some(RouteId(0));
+            .route = Some(EndpointId(0));
 
         assert_eq!(
             tree.root,
@@ -375,7 +375,7 @@ mod tests {
                         wildcard_segments: vec![WildcardSegment {
                             slug: "/index.html".into(),
                             child: Node {
-                                route: Some(RouteId(0)),
+                                route: Some(EndpointId(0)),
                                 ..Default::default()
                             },
                         }],
@@ -393,8 +393,8 @@ mod tests {
         let mut tree = Tree::default();
         tree.insert(b"/static/*/index.html", &mut None)
             .unwrap()
-            .route = Some(RouteId(0));
-        tree.insert(b"/static/*/index.js", &mut None).unwrap().route = Some(RouteId(1));
+            .route = Some(EndpointId(0));
+        tree.insert(b"/static/*/index.js", &mut None).unwrap().route = Some(EndpointId(1));
 
         assert_eq!(
             tree.root,
@@ -406,14 +406,14 @@ mod tests {
                             WildcardSegment {
                                 slug: "/index.html".into(),
                                 child: Node {
-                                    route: Some(RouteId(0)),
+                                    route: Some(EndpointId(0)),
                                     ..Default::default()
                                 },
                             },
                             WildcardSegment {
                                 slug: "/index.js".into(),
                                 child: Node {
-                                    route: Some(RouteId(1)),
+                                    route: Some(EndpointId(1)),
                                     ..Default::default()
                                 },
                             },

@@ -26,12 +26,14 @@ fn tsukuyomi_router(b: &mut Bencher) -> tsukuyomi_router::Result<()> {
     router.add_route("/comments", "comments2")?;
     router.add_route("/comments/:id", "comment2")?;
 
-    {
-        let res = router.recognize("/posts/100/comments/200");
-        assert_eq!(res.route().map(|r| r.data()), Some(&"comment"));
-        assert_eq!(&res.params().unwrap()[0], "100");
-        assert_eq!(&res.params().unwrap()[1], "200");
-        assert!(&res.params().unwrap().get_wildcard().is_none());
+    let res = router.recognize("/posts/100/comments/200");
+    if let Some((route, Some(params))) = res.route() {
+        assert_eq!(*route.data(), "comment");
+        assert_eq!(params.get(0), Some("100"));
+        assert_eq!(params.get(1), Some("200"));
+        assert!(params.get_wildcard().is_none());
+    } else {
+        panic!("unexpected condition");
     }
 
     b.iter(|| router.recognize("/posts/100/comments/200"));

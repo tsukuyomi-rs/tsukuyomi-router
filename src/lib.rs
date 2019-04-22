@@ -11,10 +11,10 @@
 //! router.add_route("/*/slug", "slug")?;
 //! router.add_route("/*", "catch_all")?;
 //!
-//! assert_eq!(router.recognize("/users/3").route().map(|r| r.data()), Some(&"users"));
-//! assert_eq!(router.recognize("/users/3/books").route().map(|r| r.data()), Some(&"users_books"));
-//! assert_eq!(router.recognize("/coffee_maker/slug").route().map(|r| r.data()), Some(&"slug"));
-//! assert_eq!(router.recognize("/made/up/url").route().map(|r| r.data()), Some(&"catch_all"));
+//! assert_eq!(router.recognize("/users/3").route().map(|(r, _)| r.data()), Some(&"users"));
+//! assert_eq!(router.recognize("/users/3/books").route().map(|(r, _)| r.data()), Some(&"users_books"));
+//! assert_eq!(router.recognize("/coffee_maker/slug").route().map(|(r, _)| r.data()), Some(&"slug"));
+//! assert_eq!(router.recognize("/made/up/url").route().map(|(r, _)| r.data()), Some(&"catch_all"));
 //! # Ok::<(), tsukuyomi_router::Error>(())
 //! ```
 //!
@@ -30,51 +30,26 @@
 //! router.add_scope("/api/v1/", "api_v1")?;
 //!
 //! assert_eq!(
-//!     router.recognize("/api/v1/posts/new").route().map(|r| r.data()),
+//!     router.recognize("/api/v1/posts/new").route().map(|(r, _)| r.data()),
 //!     Some(&"new_post")
 //! );
 //! assert_eq!(
-//!     router.recognize("/api/v1/posts/new").scope().map(|s| s.data()),
+//!     router.recognize("/api/v1/posts/new").scope().map(|(s, _)| s.data()),
 //!     Some(&"api_v1")
 //! );
 //!
 //! assert!(router.recognize("/api/v1/users").route().is_none());
 //! assert_eq!(
-//!     router.recognize("/api/v1/users").scope().map(|s| s.data()),
+//!     router.recognize("/api/v1/users").scope().map(|(s, _)| s.data()),
 //!     Some(&"api_v1")
 //! );
 //!
 //! assert_eq!(
-//!     router.recognize("/api/users").scope().map(|s| s.data()),
+//!     router.recognize("/api/users").scope().map(|(s, _)| s.data()),
 //!     Some(&"api")
 //! );
 //!
 //! assert!(router.recognize("/favicon.ico").scope().is_none());
-//! # Ok::<(), tsukuyomi_router::Error>(())
-//! ```
-//!
-//! # Trailing Slash Recommendation
-//!
-//! ```ignore
-//! # use tsukuyomi_router::Router;
-//! let mut router = Router::default();
-//! router.add("/path/to/dir", "payload")?;
-//!
-//! assert_eq!(router.find("/path/to/dir").route(), Some(&"payload"));
-//!
-//! assert!(router.find("/path/to/dir/").route().is_none());
-//! assert_eq!(router.find("/path/to/dir/").tsr(), Some(&"payload"));
-//! # Ok::<(), tsukuyomi_router::Error>(())
-//! ```
-//!
-//! ```ignore
-//! # use tsukuyomi_router::Router;
-//! let mut router = Router::default();
-//! router.add("/path/to/dir", "payload1")?;
-//! router.add("/path/to/dir/", "payload2")?;
-//!
-//! assert_eq!(router.find("/path/to/dir").route(), Some(&"payload1"));
-//! assert_eq!(router.find("/path/to/dir/").route(), Some(&"payload2"));
 //! # Ok::<(), tsukuyomi_router::Error>(())
 //! ```
 //!
@@ -91,12 +66,14 @@
 
 #[macro_use]
 mod error;
+mod endpoint;
 mod param;
 mod router;
 mod tree;
 
 pub use crate::{
+    endpoint::{Endpoint, EndpointId},
     error::{Error, Result},
     param::Params,
-    router::{Recognize, Route, RouteId, Router, Scope, ScopeId},
+    router::{Recognize, Router},
 };
