@@ -99,7 +99,7 @@ jobs:
     displayName: show tool versions
 
   - script: |
-      cargo tarpaulin -v --out Xml
+      cargo tarpaulin -v --ignore-tests --out Xml
       bash <(curl -s https://codecov.io/bash)
     displayName: 'run coverage tests'
     env:

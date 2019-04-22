@@ -26,7 +26,7 @@ impl<'a> InsertContext<'a> {
             match self.path.get(0) {
                 Some(b':') => {
                     if current.param_segment.is_some() {
-                        self.extract_param()?;
+                        self.extract_parameter_name()?;
                         current = &mut *current.param_segment.as_mut().unwrap();
                         continue;
                     }
@@ -63,16 +63,24 @@ impl<'a> InsertContext<'a> {
         Ok(None)
     }
 
-    fn extract_param(&mut self) -> Result<()> {
+    fn extract_parameter_name(&mut self) -> Result<()> {
         let end = self
             .path
             .iter()
             .position(|&c| c == b'/')
             .unwrap_or_else(|| self.path.len());
+        let name = &self.path[1..end];
+        if !name
+            .iter()
+            .all(|&c| c.is_ascii_alphanumeric() || c == b'_' || c == b'-')
+        {
+            bail!("only alphabet, numbers, underscore or hyphen can be used for parameter names");
+        }
+
         self.names
             .get_or_insert_with(Default::default)
             .names
-            .push(self.path[1..end].to_owned());
+            .push(name.to_owned());
         self.path = &self.path[end..];
         Ok(())
     }
@@ -81,7 +89,7 @@ impl<'a> InsertContext<'a> {
         while let Some(c) = self.path.get(0) {
             match c {
                 b':' => {
-                    self.extract_param()?;
+                    self.extract_parameter_name()?;
                     node = node
                         .param_segment
                         .get_or_insert_with(|| Box::new(Node::default()));
@@ -116,6 +124,10 @@ impl<'a> InsertContext<'a> {
         self.names.get_or_insert_with(Default::default).has_wildcard = true;
 
         let slug = &self.path[1..];
+        if slug.iter().find(|&&c| c == b':' || c == b'*').is_some() {
+            bail!("no parameter/wildcard can be exist after an wildcard");
+        }
+
         if let Some(pos) = node
             .wildcard_segments
             .iter_mut()
@@ -424,5 +436,35 @@ mod tests {
                 ..Default::default()
             }
         );
+    }
+
+    #[test]
+    fn failcase_invalid_param_indicator_position() {
+        let mut tree = Tree::default();
+        assert!(tree.insert(b"/path/to/seg:ment", &mut None).is_err());
+    }
+
+    #[test]
+    fn failcase_invalid_wildcard_indicator_position() {
+        let mut tree = Tree::default();
+        assert!(tree.insert(b"/path/to/wild*card", &mut None).is_err());
+    }
+
+    #[test]
+    fn failcase_param_after_wildcard() {
+        let mut tree = Tree::default();
+        assert!(tree.insert(b"/*/:param", &mut None).is_err());
+    }
+
+    #[test]
+    fn failcase_too_many_wildcards() {
+        let mut tree = Tree::default();
+        assert!(tree.insert(b"/*/*", &mut None).is_err());
+    }
+
+    #[test]
+    fn failcase_param_name_contains_indicator() {
+        let mut tree = Tree::default();
+        assert!(tree.insert(b"/path/to/:param:name", &mut None).is_err());
     }
 }
