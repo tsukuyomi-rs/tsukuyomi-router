@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Endpoint","An endpoint in `Router`."],["EndpointId","The identifier of `Endpoint`."],["Error",""],["Params","A set of captured parameter values from an HTTP path."],["Recognize","A value that contains the recognition result of the router."],["Router","An HTTP router."]],"type":[["Result",""]]});
